@@ -5,7 +5,7 @@ import datetime
 
 class Cache:
     @staticmethod
-    def load():
+    def load() -> dict:
         json_info = {}
         print('Loading the cache...')
         if os.path.exists('cache.txt'):
@@ -20,14 +20,14 @@ class Cache:
         return json_info
 
     @staticmethod
-    def save(data):
+    def save(data) -> None:
         with open(f'cache.txt', 'w') as file:
             for line in data.values():
                 json.dump(line, file)
                 file.write('\n')
 
     @staticmethod
-    def update(data):
+    def update(data) -> None:
         while data.check_cache:
             for domain, value in data.cache.copy().items():
                 if not Cache.check_ttl(data.cache[domain]):
@@ -36,7 +36,7 @@ class Cache:
         Cache.save(data.cache)
 
     @staticmethod
-    def check_ttl(data):
+    def check_ttl(data: dict) -> bool:
         for qtype, value in data['data'].copy().items():
             for record in value:
                 time = datetime.datetime.fromisoformat(data['time'])
@@ -44,4 +44,4 @@ class Cache:
                     value.remove(record)
             if not value:
                 data['data'].pop(qtype)
-        return len(data['data'])
+        return bool(data['data'])

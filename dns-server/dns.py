@@ -17,11 +17,11 @@ class DNS:
         b'\x00\x02': 'ns'
     }
 
-    def __init__(self, cache):
+    def __init__(self, cache: dict) -> None:
         self.cache = cache
         self.check_cache = 1
 
-    def make_response(self, data):
+    def make_response(self, data: bytes) -> bytes:
         request_info = Parser.parse_incoming_request(data)
         request_type = request_info['question']['QTYPE']
         current_response = b''
@@ -32,15 +32,14 @@ class DNS:
 
         return current_response
 
-    def build_response(self, data):
-        records_data = self.get_records(data[12:])
+    def build_response(self, data: bytes) -> bytes:
+        records, record_type, domain = self.get_records(data[12:])
         header = Header(
             ID=data[0:2],
             FLAGS=self.build_response_flags(data[2:4]),
-            ANCOUNT=len(records_data[0]).to_bytes(2, byteorder='big'),
+            ANCOUNT=len(records).to_bytes(2, byteorder='big'),
         ).__bytes__()
 
-        records, record_type, domain = records_data
         question = self.build_question(domain, record_type)
         body = b''.join([self.record_to_bytes(record_type, record['ttl'], record['value']) for record in records])
 
@@ -49,7 +48,7 @@ class DNS:
 
         return header + question + body
 
-    def get_records(self, data):
+    def get_records(self, data) -> tuple[list, str, str]:
         domain, qt = Parser.get_question_domain(data)
         question_type = self.question_type[qt] if qt in self.question_type else ''
         records = b''
@@ -62,7 +61,7 @@ class DNS:
 
         return records, question_type, domain
 
-    def build_response_flags(self, flags):
+    def build_response_flags(self, flags: bytes) -> bytes:
         first_byte = flags[:1]
         flags = Flags(
             OPCODE=''.join([Parser.get_bit_in_byte(first_byte, bit) for bit in range(1, 5)])
@@ -71,47 +70,47 @@ class DNS:
             self.flags_to_bytes(flags.get_part1()) + self.flags_to_bytes(flags.get_part2())
 
     @staticmethod
-    def flags_to_bytes(*args):
+    def flags_to_bytes(*args) -> bytes:
         return int(''.join(args), 2).to_bytes(1, byteorder='big')
 
     @staticmethod
-    def build_question(domain, rec_type: str) -> bytes:
+    def build_question(domain: str, record_type: str) -> bytes:
         question = b''
 
         for part in domain.split('.'):
             question += bytes([len(part)])
             question += b''.join([ord(char).to_bytes(1, byteorder='big') for char in part])
 
-        if rec_type == 'a':
+        if record_type == 'a':
             question += b'\x00\x01'
-        elif rec_type == 'ns':
+        elif record_type == 'ns':
             question += b'\x00\x02'
 
         question += b'\x00\x01'
         return question
 
     @staticmethod
-    def record_to_bytes(rec_type, ttl, value):
+    def record_to_bytes(record_type: str, ttl: int, value: str) -> bytes:
         record = b'\xc0\x0c'
 
-        if rec_type == 'a':
+        if record_type == 'a':
             record += b'\x00\x01'
-        elif rec_type == 'ns':
+        elif record_type == 'ns':
             record += b'\x00\x02'
 
         record += b'\x00\x01'
         record += int(ttl).to_bytes(4, byteorder='big')
 
-        if rec_type == 'a':
+        if record_type == 'a':
             record += b'\x00\x04'
             record += b''.join([bytes([int(part)]) for part in value.split('.')])
-        elif rec_type == 'ns':
+        elif record_type == 'ns':
             byte_value = bytes(bytearray.fromhex(value))
             record += bytes([0, len(byte_value)]) + byte_value
 
         return record
 
-    def make_info_from_response(self, data, domain, qtype):
+    def make_info_from_response(self, data: bytes, domain: str, qtype: str) -> dict:
         question = self.build_question(domain, qtype)
         ancount = int.from_bytes(data[6:8], 'big')
         answer = data[12 + len(question):]
@@ -124,10 +123,10 @@ class DNS:
         return self.cache[domain]
 
     @staticmethod
-    def make_ipv4_from_bytes(data_bytes):
+    def make_ipv4_from_bytes(data_bytes: bytes) -> str:
         return '.'.join([str(byte) for byte in data_bytes])
 
-    def get_records_from_answer(self, answer, count):
+    def get_records_from_answer(self, answer: bytes, count: int) -> dict:
         ptr = 0
         records = {}
 
@@ -155,7 +154,7 @@ class DNS:
 
         return records
 
-    def find_data(self, domain, qtype):
+    def find_data(self, domain: str, qtype: str) -> dict:
         request = self.build_request(domain, qtype)
         temp_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         temp_sock.sendto(request, TRUST_SERVER)
@@ -164,7 +163,7 @@ class DNS:
         info = self.make_info_from_response(data, domain, qtype)
         return info
 
-    def get_info(self, domain, qtype):
+    def get_info(self, domain: str, qtype: str) -> dict:
         if domain in self.cache:
             info = self.cache[domain]
             if qtype in info['data']:
@@ -179,7 +178,7 @@ class DNS:
 
         return info
 
-    def build_request(self, domain, qtype):
+    def build_request(self, domain: str, qtype: str) -> bytes:
         header = Header().__bytes__()
         question = self.build_question(domain, qtype)
         return header + question

@@ -34,7 +34,7 @@ class Flags:
 
 class Parser:
     @staticmethod
-    def parse_incoming_request(data):
+    def parse_incoming_request(data: bytes) -> dict:
         header = Parser.parse_header(data)
         domain, question_type = Parser.get_question_domain(data[12:])
         parsed_type = Parser.make_type_from_number(int.from_bytes(question_type, 'big'))
@@ -46,7 +46,7 @@ class Parser:
         return {'header': header, 'question': question}
 
     @staticmethod
-    def parse_header(data):
+    def parse_header(data: bytes) -> dict:
         return asdict(
             Header(
                 ID=data[0:2],
@@ -59,7 +59,7 @@ class Parser:
         )
 
     @staticmethod
-    def parse_flags(flags):
+    def parse_flags(flags: bytes) -> dict:
         first_byte = flags[:1]
         second_byte = flags[1:2]
 
@@ -77,7 +77,7 @@ class Parser:
         )
 
     @staticmethod
-    def get_question_domain(data):
+    def get_question_domain(data: bytes) -> tuple[str, bytes]:
         domain = ''
         byte = 0
 
@@ -90,11 +90,11 @@ class Parser:
         return domain, question_type
 
     @staticmethod
-    def get_bit_in_byte(byte, position):
+    def get_bit_in_byte(byte: bytes, position: int) -> str:
         return str(ord(byte) & (1 << position))
 
     @staticmethod
-    def make_type_from_number(current_type):
+    def make_type_from_number(current_type: int) -> str:
         if current_type == 1:
             return 'a'
         elif current_type == 2:
